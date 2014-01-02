@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension>
+
+  <classpath name="src" />
+
+  <section if="android">
+
+    <dependency name="linden-google-play" path="dependencies/linden-google-play" if="android" />
+    <android extension="ru.zzzzzzerg.linden.GooglePlay" />
+
+  </section>
+</extension>
+
