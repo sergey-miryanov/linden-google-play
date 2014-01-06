@@ -5,6 +5,7 @@ class ConnectionHandler
   public function new()
   {
     achievements = new Array<Achievement>();
+    states = new Array<AppState>();
   }
 
   public function onWarning(msg : String, where : String)
@@ -36,15 +37,25 @@ class ConnectionHandler
 
   private function _onAchievementsLoaded()
   {
-    onAchievementsLoaded(achievements.copy());
-    achievements = new Array<Achievement>();
+    onAchievementsLoaded(achievements);
   }
 
   public function onAchievementsLoaded(achievements : Array<Achievement>)
   {
   }
 
-  public function onStateListLoaded(states : Array<Dynamic>)
+  private function _onLoadStateInfo(key : Int, localVersion : String, localData : String,
+      hasConflict : Bool, conflictVersion : String, conflictData : String)
+  {
+    states.push(new AppState(key, localVersion, localData, hasConflict, conflictVersion, conflictData));
+  }
+
+  private function _onStateListLoaded()
+  {
+    onStateListLoaded(states);
+  }
+
+  public function onStateListLoaded(states : Array<AppState>)
   {
   }
 
@@ -66,4 +77,5 @@ class ConnectionHandler
   }
 
   public var achievements : Array<Achievement>;
+  public var states : Array<AppState>;
 }

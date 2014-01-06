@@ -739,14 +739,26 @@ class StateHandler implements OnStateListLoadedListener,
     ArrayList<AppState> states = new ArrayList<AppState>();
     for(AppState s : buffer)
     {
-      //String version = s.getLocalVersion();
-      //int key = s.getKey();
-      states.add(s);
+      String localVersion = s.getLocalVersion();
+      String localData = new String(s.getLocalData());
+      int key = s.getKey();
+      String conflictVersion = "";
+      String conflictData = "";
+      boolean hasConflict = s.hasConflict();
+      if(hasConflict)
+      {
+        conflictVersion = s.getConflictVersion();
+        conflictData = new String(s.getConflictData());
+      }
+
+      GooglePlay.callHaxe("_onLoadStateInfo",
+          new Object[] {key, localVersion, localData, hasConflict, conflictVersion, conflictData});
       Log.i(GooglePlay.tag, s.toString());
     }
 
+
     buffer.close();
-    GooglePlay.callHaxe("onStateListLoaded", states.toArray());
+    GooglePlay.callHaxe("_onStateListLoaded", new Object[]{});
   }
 
   public void onStateDeleted(int statusCode, int stateKey)
