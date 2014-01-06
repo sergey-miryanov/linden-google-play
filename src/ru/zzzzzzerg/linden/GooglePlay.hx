@@ -37,6 +37,11 @@ class GooglePlay
   }
 
 #if android
+  public function isAvailable() : Bool
+  {
+    return _isAvailable();
+  }
+
   private static function initJNI()
   {
     if(_start == null)
@@ -44,8 +49,20 @@ class GooglePlay
       _start = JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
           "start", "(Lorg/haxe/lime/HaxeObject;)V");
     }
+
+    if(_isAvailable == null)
+    {
+      _isAvailable = JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
+          "isAvailable", "()Z");
+    }
   }
 
   private static var _start : Dynamic = null;
+  private static var _isAvailable : Dynamic = null;
+#else
+  public function isAvailable() : Bool
+  {
+    return false;
+  }
 #end
 }

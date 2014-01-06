@@ -8,14 +8,19 @@ class AppStateClientImpl
     initJNI();
   }
 
-  public function signIn() : Bool
+  public function connect() : Bool
   {
-    return _signIn();
+    return _connect();
   }
 
   public function signOut()
   {
     _signOut();
+  }
+
+  public function isSignedIn() : Bool
+  {
+    return _isSignedIn();
   }
 
   public function loadState(stateKey : Int)
@@ -41,16 +46,22 @@ class AppStateClientImpl
 
   private static function initJNI()
   {
-    if(_signIn == null)
+    if(_connect == null)
     {
-      _signIn = openfl.utils.JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
-          "signInAppStateClient", "()Z");
+      _connect = openfl.utils.JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
+          "connectAppStateClient", "()Z");
     }
 
     if(_signOut == null)
     {
       _signOut = openfl.utils.JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
           "signOutAppStateClient", "()V");
+    }
+
+    if(_isSignedIn == null)
+    {
+      _isSignedIn = openfl.utils.JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
+          "isAppStateClientSignedIn", "()Z");
     }
 
     if(_loadState == null)
@@ -78,8 +89,9 @@ class AppStateClientImpl
     }
   }
 
-  private static var _signIn : Dynamic = null;
+  private static var _connect : Dynamic = null;
   private static var _signOut : Dynamic = null;
+  private static var _isSignedIn : Dynamic = null;
   private static var _loadState : Dynamic = null;
   private static var _updateState : Dynamic = null;
   private static var _resolveState : Dynamic = null;
@@ -97,7 +109,7 @@ class AppStateClientFallback
     _handler = handler;
   }
 
-  public function signIn() : Bool
+  public function connect() : Bool
   {
     _handler.onSignedIn("APP_STATE_CLIENT");
     return true;
@@ -105,6 +117,11 @@ class AppStateClientFallback
   public function signOut()
   {
     _handler.onSignedOut("APP_STATE_CLIENT");
+  }
+
+  public function isSignedIn()
+  {
+    return true;
   }
 
   public function loadState(stateKey : Int)

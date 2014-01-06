@@ -8,11 +8,19 @@ import android.util.Log;
 import android.view.Gravity;
 import android.opengl.GLSurfaceView;
 import java.util.ArrayList;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+
+import android.content.DialogInterface.OnCancelListener;
+import android.content.DialogInterface;
 
 import com.google.android.gms.common.GooglePlayServicesClient.ConnectionCallbacks;
 import com.google.android.gms.common.GooglePlayServicesClient.OnConnectionFailedListener;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.Scopes;
+import com.google.android.gms.common.GooglePlayServicesUtil;
 
 import com.google.android.gms.games.GamesClient;
 import com.google.android.gms.games.achievement.OnAchievementsLoadedListener;
@@ -54,6 +62,10 @@ public class GooglePlay extends Extension
    */
   public void onCreate(Bundle savedInstanceState)
   {
+    if(state == null)
+    {
+      state = new GooglePlayState(mainActivity, mainContext);
+    }
   }
 
 
@@ -71,6 +83,7 @@ public class GooglePlay extends Extension
    */
   public void onPause()
   {
+    state.save(mainActivity, mainContext);
   }
 
 
@@ -122,6 +135,8 @@ public class GooglePlay extends Extension
    */
   public void onStop()
   {
+    state.save(mainActivity, mainContext);
+
     Log.i(tag, "Stoping LindenGooglePlay");
     if(gamesClient != null)
     {
@@ -145,6 +160,8 @@ public class GooglePlay extends Extension
 
   public static String tag = "LindenGooglePlay";
 
+  public static GooglePlayState state = null;
+
   public static int result = ConnectionResult.DEVELOPER_ERROR;
 
   public static int GOOGLE_PLAY_SIGN_IN_REQUEST = 20201;
@@ -155,28 +172,19 @@ public class GooglePlay extends Extension
   public static void handleException(Exception e, String where)
   {
     callHaxe("onException", new Object[] {e.getMessage(), where});
+    Log.d(tag, "Exception at " + where + ": " + e.toString());
     e.printStackTrace();
-    if(callback == null)
-    {
-      Log.w(tag, "Exception at " + where + ": " + e.toString());
-    }
   }
 
   public static void gamesClientError(int code, String where)
   {
     callHaxe("onError", new Object[] {"GAMES_CLIENT", code, where});
-    if(callback == null)
-    {
-      Log.w(tag, "Error at " + where + " with code = " + code);
-    }
+    Log.d(tag, "Error at " + where + " with code = " + code);
   }
   public static void appStateClientError(int code, String where)
   {
     callHaxe("onError", new Object[] {"APP_STATE_CLIENT", code, where});
-    if(callback == null)
-    {
-      Log.w(tag, "Error at " + where + " with code = " + code);
-    }
+    Log.d(tag, "Error at " + where + " with code = " + code);
   }
 
   public static void callHaxe(final String name, final Object[] args)
@@ -196,14 +204,31 @@ public class GooglePlay extends Extension
 
   public static void start(HaxeObject haxeCallback)
   {
+    Log.i(tag, "Starting GooglePlay service");
     callback = haxeCallback;
+    Log.i(tag, "GooglePlay service started");
   }
 
-  public static boolean signInGamesClient()
+  public static boolean isGamesClientSignedIn()
+  {
+    return state.isSignedInGamesClient;
+  }
+
+  public static boolean isAppStateClientSignedIn()
+  {
+    return state.isSignedInAppStateClient;
+  }
+
+  public static boolean isAvailable()
+  {
+    return GooglePlayServicesUtil.isGooglePlayServicesAvailable(mainContext) == ConnectionResult.SUCCESS;
+  }
+
+  public static boolean connectGamesClient()
   {
     boolean failed = false;
 
-    Log.i(tag, "Signing In to GooglePlayGames");
+    Log.i(tag, "Connect to GamesClient");
     try
     {
       if(!gamesClient.isConnected() && !gamesClient.isConnecting())
@@ -236,11 +261,11 @@ public class GooglePlay extends Extension
     return !failed;
   }
 
-  public static boolean signInAppStateClient()
+  public static boolean connectAppStateClient()
   {
     boolean failed = false;
 
-    Log.i(tag, "Signing In to GooglePlay CloudSave");
+    Log.i(tag, "Connect to AppStateClient");
     try
     {
       if(!appStateClient.isConnected() && !appStateClient.isConnected())
@@ -280,6 +305,8 @@ public class GooglePlay extends Extension
     if(gamesClient != null && gamesClient.isConnected())
     {
       gamesClient.signOut(); // FIXME: sign out with listener
+      state.isSignedInGamesClient = false;
+      state.save(mainActivity, mainContext);
       callHaxe("onSignedOut", new Object[] {"GAMES_CLIENT"});
     }
   }
@@ -291,6 +318,8 @@ public class GooglePlay extends Extension
     if(appStateClient != null && appStateClient.isConnected())
     {
       appStateClient.signOut();
+      state.isSignedInAppStateClient = false;
+      state.save(mainActivity, mainContext);
       callHaxe("onSignedOut", new Object[] {"APP_STATE_CLIENT"});
     }
     else if(appStateClient == null)
@@ -514,12 +543,56 @@ public class GooglePlay extends Extension
     Log.i(tag, "handleActivityResult: " + rc + " " + resultCode);
     if(rc == GOOGLE_PLAY_SIGN_IN_REQUEST)
     {
-      connectionEstablished("GAMES_CLIENT");
+      if(resultCode == Activity.RESULT_OK)
+      {
+        Log.d(tag, "Signed in to GamesClient");
+        connectGamesClient();
+      }
+      else if(resultCode == Activity.RESULT_CANCELED)
+      {
+        Log.d(tag, "SignIn to GamesClient canceled");
+        state.isSignedInGamesClient = false;
+        state.save(mainActivity, mainContext);
+      }
+      else
+      {
+        if(GooglePlayServicesUtil.isUserRecoverableError(resultCode))
+        {
+          GooglePlayServicesUtil.getErrorDialog(resultCode, mainActivity, rc).show();
+        }
+        else
+        {
+          gamesClientError(resultCode, "handleActivityResult");
+        }
+      }
+
       return true;
     }
     else if(rc == GOOGLE_PLAY_APP_STATE_SIGN_IN_REQUEST)
     {
-      connectionEstablished("APP_STATE_CLIENT");
+      if(resultCode == Activity.RESULT_OK)
+      {
+        Log.d(tag, "Signed in to AppStateClient");
+        connectAppStateClient();
+      }
+      else if(resultCode == Activity.RESULT_CANCELED)
+      {
+        Log.d(tag, "SignIn to AppStateClient canceled");
+        state.isSignedInAppStateClient = false;
+        state.save(mainActivity, mainContext);
+      }
+      else
+      {
+        if(GooglePlayServicesUtil.isUserRecoverableError(resultCode))
+        {
+          GooglePlayServicesUtil.getErrorDialog(resultCode, mainActivity, rc).show();
+        }
+        else
+        {
+          appStateClientError(resultCode, "handleActivityResult");
+        }
+      }
+
       return true;
     }
     else if(rc == GOOGLE_PLAY_SHOW_ACHIEVEMENTS_REQUEST)
@@ -545,16 +618,20 @@ public class GooglePlay extends Extension
     }
     else
     {
-      callHaxe("onSignedIn", new Object[] {what});
+      callHaxe("onConnectionEstablished", new Object[] {what});
     }
 
     if(what == "GAMES_CLIENT" && gamesClient != null && gamesClient.isConnected())
     {
       gamesClient.loadAchievements(new AchievementsHandler("GAMES_CLIENT", tag), false);
+      state.isSignedInGamesClient = true;
+      state.save(mainActivity, mainContext);
     }
     if(what == "APP_STATE_CLIENT" && appStateClient != null && appStateClient.isConnected())
     {
       appStateClient.listStates(new StateHandler("APP_STATE_CLIENT", tag));
+      state.isSignedInAppStateClient = true;
+      state.save(mainActivity, mainContext);
     }
   }
 }
@@ -731,5 +808,72 @@ class StateHandler implements OnStateListLoadedListener,
       GooglePlay.handleException(e, "onStateLoaded");
     }
   }
+}
+
+
+class GooglePlayState
+{
+  public boolean isSignedInGamesClient;
+  public boolean isSignedInAppStateClient;
+
+  public String filename;
+
+  public GooglePlayState(Activity activity, Context ctx)
+  {
+    filename = ".linden-google-play";
+    isSignedInGamesClient = false;
+    isSignedInAppStateClient = false;
+
+    load(activity, ctx);
+  }
+
+  public void load(Activity activity, Context ctx)
+  {
+    try
+    {
+      Log.d(GooglePlay.tag, "Loading GooglePlayState from " + filename);
+      File filepath = ctx.getFileStreamPath(filename);
+      if(filepath.exists())
+      {
+        DataInputStream input = new DataInputStream(activity.openFileInput(filename));
+        isSignedInGamesClient = input.readBoolean();
+        isSignedInAppStateClient = input.readBoolean();
+
+        Log.d(GooglePlay.tag, "isSignedInGamesClient: " + isSignedInGamesClient);
+        Log.d(GooglePlay.tag, "isSignedInAppStateClient: " + isSignedInAppStateClient);
+
+        input.close();
+      }
+      else
+      {
+        Log.w(GooglePlay.tag, "File " + filename + " doesn't exist");
+      }
+      Log.d(GooglePlay.tag, "GooglePlayState loaded");
+    }
+    catch(IOException e)
+    {
+      Log.e(GooglePlay.tag, e.toString());
+      e.printStackTrace();
+    }
+  }
+
+  public void save(Activity activity, Context ctx)
+  {
+    try
+    {
+      Log.d(GooglePlay.tag, "Saving GooglePlayState");
+      DataOutputStream output = new DataOutputStream(activity.openFileOutput(filename, Context.MODE_PRIVATE));
+      output.writeBoolean(isSignedInGamesClient);
+      output.writeBoolean(isSignedInAppStateClient);
+      output.close();
+      Log.d(GooglePlay.tag, "GooglePlayState saved");
+    }
+    catch(IOException e)
+    {
+      Log.e(GooglePlay.tag, e.toString());
+      e.printStackTrace();
+    }
+  }
+
 }
 

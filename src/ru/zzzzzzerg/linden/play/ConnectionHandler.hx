@@ -18,7 +18,7 @@ class ConnectionHandler
   {
   }
 
-  public function onSignedIn(what : String)
+  public function onConnectionEstablished(what : String)
   {
   }
 

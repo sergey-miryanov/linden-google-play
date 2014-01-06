@@ -11,14 +11,19 @@ class GamesClientImpl
     initJNI();
   }
 
-  public function signIn() : Bool
+  public function connect() : Bool
   {
-    return _signIn();
+    return _connect();
   }
 
   public function signOut()
   {
     _signOut();
+  }
+
+  public function isSignedIn() : Bool
+  {
+    return _isSignedIn();
   }
 
   public function unlockAchievement(achievementId : String)
@@ -48,16 +53,22 @@ class GamesClientImpl
 
   private static function initJNI()
   {
-    if(_signIn == null)
+    if(_connect == null)
     {
-      _signIn = JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
-          "signInGamesClient", "()Z");
+      _connect = JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
+          "connectGamesClient", "()Z");
     }
 
     if(_signOut == null)
     {
       _signOut = openfl.utils.JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
           "signOutGamesClient", "()V");
+    }
+
+    if(_isSignedIn == null)
+    {
+      _isSignedIn = openfl.utils.JNI.createStaticMethod("ru/zzzzzzerg/linden/GooglePlay",
+          "isGamesClientSignedIn", "()Z");
     }
 
     if(_unlockAchievement == null)
@@ -91,8 +102,9 @@ class GamesClientImpl
     }
   }
 
-  private static var _signIn : Dynamic = null;
+  private static var _connect : Dynamic = null;
   private static var _signOut : Dynamic = null;
+  private static var _isSignedIn : Dynamic = null;
   private static var _unlockAchievement : Dynamic = null;
   private static var _incrementAchievement : Dynamic = null;
   private static var _showAchievements : Dynamic = null;
@@ -111,14 +123,18 @@ class GamesClientFallback
     _handler = handler;
   }
 
-  public function signIn() : Bool
+  public function connect() : Bool
   {
-    _handler.onSignedIn("GAMES_CLIENT");
+    _handler.onConnectionEstablished("GAMES_CLIENT");
     return true;
   }
   public function signOut()
   {
     _handler.onSignedOut("GAMES_CLIENT");
+  }
+  public function isSignedIn()
+  {
+    return true;
   }
   public function unlockAchievement(achievementId : String)
   {
