@@ -13,9 +13,6 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 
-import android.content.DialogInterface.OnCancelListener;
-import android.content.DialogInterface;
-
 import com.google.android.gms.common.GooglePlayServicesClient.ConnectionCallbacks;
 import com.google.android.gms.common.GooglePlayServicesClient.OnConnectionFailedListener;
 import com.google.android.gms.common.ConnectionResult;
@@ -461,7 +458,7 @@ public class GooglePlay extends Extension
     {
       if(appStateClient != null && appStateClient.isConnected())
       {
-        appStateClient.loadState(new StateHandler("APP_STATE_CLIENT", tag), stateKey);
+        appStateClient.loadState(new StateHandler("APP_STATE_CLIENT"), stateKey);
         Log.i(tag, "Loading state: " + stateKey);
       }
       else
@@ -501,7 +498,7 @@ public class GooglePlay extends Extension
     {
       if(appStateClient != null && appStateClient.isConnected())
       {
-        appStateClient.resolveState(new StateHandler("APP_STATE_CLIENT", tag),
+        appStateClient.resolveState(new StateHandler("APP_STATE_CLIENT"),
               stateKey, version, data.getBytes());
         Log.i(tag, "Resolving state: " + stateKey + " version: " + version);
       }
@@ -522,7 +519,7 @@ public class GooglePlay extends Extension
     {
       if(appStateClient != null && appStateClient.isConnected())
       {
-        appStateClient.deleteState(new StateHandler("APP_STATE_CLIENT", tag),
+        appStateClient.deleteState(new StateHandler("APP_STATE_CLIENT"),
             stateKey);
         Log.i(tag, "Deleting state: " + stateKey);
       }
@@ -623,13 +620,13 @@ public class GooglePlay extends Extension
 
     if(what == "GAMES_CLIENT" && gamesClient != null && gamesClient.isConnected())
     {
-      gamesClient.loadAchievements(new AchievementsHandler("GAMES_CLIENT", tag), false);
+      gamesClient.loadAchievements(new AchievementsHandler("GAMES_CLIENT"), false);
       state.isSignedInGamesClient = true;
       state.save(mainActivity, mainContext);
     }
     if(what == "APP_STATE_CLIENT" && appStateClient != null && appStateClient.isConnected())
     {
-      appStateClient.listStates(new StateHandler("APP_STATE_CLIENT", tag));
+      appStateClient.listStates(new StateHandler("APP_STATE_CLIENT"));
       state.isSignedInAppStateClient = true;
       state.save(mainActivity, mainContext);
     }
@@ -690,29 +687,37 @@ class ConnectionHandler implements ConnectionCallbacks, OnConnectionFailedListen
 class AchievementsHandler implements OnAchievementsLoadedListener
 {
   String what;
-  String tag;
 
-  AchievementsHandler(String what, String tag)
+  AchievementsHandler(String what)
   {
     super();
     this.what = what;
-    this.tag = tag;
   }
 
   public void onAchievementsLoaded(int statusCode, AchievementBuffer buffer)
   {
-    Log.i(tag, what + ": AchievementsHandler.onAchievementsLoaded: " + statusCode);
-    ArrayList<Achievement> achievements = new ArrayList<Achievement>();
+    Log.i(GooglePlay.tag, what + ": AchievementsHandler.onAchievementsLoaded: " + statusCode);
     for(Achievement a : buffer)
     {
-      //String id = a.getAchievementId();
-      //int state = a.getState();
-      //int type = a.getType();
-      achievements.add(a);
+      String id = a.getAchievementId();
+      String name = a.getName();
+      int state = a.getState();
+      int type = a.getType();
+      int steps = 0;
+      int totalSteps = 0;
+      if(type == Achievement.TYPE_INCREMENTAL)
+      {
+        steps = a.getCurrentSteps();
+        totalSteps = a.getTotalSteps();
+      }
+
+      Log.d(GooglePlay.tag, a.toString());
+      GooglePlay.callHaxe("_onLoadAchievement",
+          new Object[] {id, name, state, type, steps, totalSteps});
     }
 
     buffer.close();
-    GooglePlay.callHaxe("onAchievementsLoaded", achievements.toArray());
+    GooglePlay.callHaxe("_onAchievementsLoaded", new Object[] {});
   }
 }
 
@@ -721,25 +726,23 @@ class StateHandler implements OnStateListLoadedListener,
       OnStateLoadedListener
 {
   String what;
-  String tag;
 
-  StateHandler(String what, String tag)
+  StateHandler(String what)
   {
     super();
     this.what = what;
-    this.tag = tag;
   }
 
   public void onStateListLoaded(int statusCode, AppStateBuffer buffer)
   {
-    Log.i(tag, what + ": StateHandler.onStateListLoaded: " + statusCode);
+    Log.i(GooglePlay.tag, what + ": StateHandler.onStateListLoaded: " + statusCode);
     ArrayList<AppState> states = new ArrayList<AppState>();
     for(AppState s : buffer)
     {
       //String version = s.getLocalVersion();
       //int key = s.getKey();
       states.add(s);
-      Log.i(tag, s.toString());
+      Log.i(GooglePlay.tag, s.toString());
     }
 
     buffer.close();
@@ -748,7 +751,7 @@ class StateHandler implements OnStateListLoadedListener,
 
   public void onStateDeleted(int statusCode, int stateKey)
   {
-    Log.i(tag, what + ": StateHandler.onStateDeleted: " +
+    Log.i(GooglePlay.tag, what + ": StateHandler.onStateDeleted: " +
         statusCode + " key = " + stateKey);
     GooglePlay.callHaxe("onStateDeleted", new Object[]{statusCode, stateKey});
   }
@@ -758,7 +761,7 @@ class StateHandler implements OnStateListLoadedListener,
   {
     try
     {
-      Log.w(tag, what + ": StateHandler.onStateConflict: key = " +
+      Log.w(GooglePlay.tag, what + ": StateHandler.onStateConflict: key = " +
           stateKey + " version = " + resolvedVersion);
 
       String localString = new String(localData);
@@ -777,7 +780,7 @@ class StateHandler implements OnStateListLoadedListener,
   {
     try
     {
-      Log.i(tag, what + ": StateHandler.onStateLoaded: " +
+      Log.i(GooglePlay.tag, what + ": StateHandler.onStateLoaded: " +
           statusCode + " key = " + stateKey);
 
       if(statusCode == AppStateClient.STATUS_OK)
@@ -788,7 +791,7 @@ class StateHandler implements OnStateListLoadedListener,
       }
       else if(statusCode == AppStateClient.STATUS_NETWORK_ERROR_STALE_DATA)
       {
-        Log.i(tag, "Load possible out-of-sync cached data");
+        Log.i(GooglePlay.tag, "Load possible out-of-sync cached data");
         String data = new String(localData);
         GooglePlay.callHaxe("onStateLoaded",
             new Object[] {stateKey, data, true});

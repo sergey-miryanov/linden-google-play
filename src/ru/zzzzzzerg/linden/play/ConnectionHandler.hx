@@ -4,6 +4,7 @@ class ConnectionHandler
 {
   public function new()
   {
+    achievements = new Array<Achievement>();
   }
 
   public function onWarning(msg : String, where : String)
@@ -26,7 +27,20 @@ class ConnectionHandler
   {
   }
 
-  public function onAchievementsLoaded(achievements : Array<Dynamic>)
+  private function _onLoadAchievement(id : String, name : String,
+      state : Int, type : Int,
+      steps : Int, totalSteps : Int)
+  {
+    achievements.push(new Achievement(id, name, state, type, steps, totalSteps));
+  }
+
+  private function _onAchievementsLoaded()
+  {
+    onAchievementsLoaded(achievements.copy());
+    achievements = new Array<Achievement>();
+  }
+
+  public function onAchievementsLoaded(achievements : Array<Achievement>)
   {
   }
 
@@ -50,4 +64,6 @@ class ConnectionHandler
   public function onStateNotFound(stateKey : Int)
   {
   }
+
+  public var achievements : Array<Achievement>;
 }
