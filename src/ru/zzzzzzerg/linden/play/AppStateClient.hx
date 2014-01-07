@@ -103,25 +103,29 @@ typedef AppStateClient = AppStateClientImpl;
 class AppStateClientFallback
 {
   var _handler : ConnectionHandler;
+  var _isSignedIn : Bool;
 
   public function new(handler : ConnectionHandler)
   {
     _handler = handler;
+    _isSignedIn = false;
   }
 
   public function connect() : Bool
   {
-    _handler.onSignedIn("APP_STATE_CLIENT");
+    _handler.onConnectionEstablished("APP_STATE_CLIENT");
+    _isSignedIn = true;
     return true;
   }
   public function signOut()
   {
     _handler.onSignedOut("APP_STATE_CLIENT");
+    _isSignedIn = false;
   }
 
   public function isSignedIn()
   {
-    return true;
+    return _isSignedIn;
   }
 
   public function loadState(stateKey : Int)
